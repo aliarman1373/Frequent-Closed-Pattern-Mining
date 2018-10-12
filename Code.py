@@ -2,6 +2,11 @@
 import nltk.stem
 import collections as cl
 from sklearn.feature_extraction.text import CountVectorizer
+import os
+import random
+
+
+
 
 #Node class for the Creating Tree and N-List
 class Node:
@@ -291,7 +296,18 @@ def find_FCI(n_list,minsupp):
     else:
         return n_list
 
-        
+#Select Three directories randomly
+def selectRandomDirectories(root,number):
+    #"C:/Users/Ali/Desktop/Training"
+    address_list=[]
+    folder_names=[name for name in os.listdir(root)]
+    Chosen_folders=random.sample(folder_names,number)
+    for name in Chosen_folders:
+       address_list.append(root+"/"+name)
+    return address_list
+
+
+
 # create the transformer
 vectorizer =StemmedCountVectorizer(encoding='utf-8', 
                 decode_error='strict',
@@ -308,31 +324,83 @@ vectorizer =StemmedCountVectorizer(encoding='utf-8',
                 vocabulary=None, 
                 binary=False)
 
-#input the database
-file_adress="2.txt"
-
-#convert text file to string
-file = open(file_adress, 'r')
-text = file.read().strip()
-file.close()
-
-#split the text by paragraphs
-y = [s.strip() for s in text.splitlines()]
-
-
-#get the words of each paragraph and save it in 'paragraph_words'
 paragraph_words=[]
-for i,p in enumerate(y):
-    try:
-        vectorizer.fit([p])
-        paragraph_words.append(vectorizer.get_feature_names())
-    except ValueError:
-        continue
+address_list=selectRandomDirectories("C:/Users/Ali/Desktop/Training",3)
+#input the database
+for file_adress in address_list:
     
-#count each word in text
-words_count = cl.Counter()
-for sublist in paragraph_words:     
-    words_count.update(sublist)
+    #convert text file to string
+    for file_name in os.listdir(file_adress):
+        file = open(file_adress+"/"+file_name, 'r')
+        text = file.read().strip()
+        file.close()
+        vectorizer.fit([text])
+        paragraph_words.append(vectorizer.get_feature_names())
+    
+    #count each word in text
+    words_count = cl.Counter()
+    for sublist in paragraph_words:     
+        words_count.update(sublist)
+    
+    
+    # delete the words with frequency less than support(0.3)
+    total = sum(words_count.values(), 0.0)
+    min_support=total*0.004
+    words_frequency={}
+    for key,value in words_count.items():
+        if words_count[key]>min_support:
+         words_frequency[key]=words_count[key]
+
+    #sort the paragraph_words by the values and save that in a list
+    for i in range(len(paragraph_words)):
+        temp={}
+        for w in paragraph_words[i]:
+            try:
+                temp[w]=words_frequency[w]
+            except:
+                pass
+        paragraph_words[i]=sorted(temp,key=temp.get,reverse=True)
+
+    #Add words in each paragraph which has the min supp and be sorted, to tree
+    tree=Tree()
+    temp_paragraph_words=paragraph_words
+    for pw in temp_paragraph_words:
+        try:
+            if(len(pw)>0):
+                tree.addToTree(tree.root,pw)
+        except (RuntimeError, TypeError, NameError):
+            print(NameError)
+    
+    tree.postorder(tree.root)
+    tree.preorder(tree.root)
+
+    
+    #create the N-list which contatins itemset and the tuples(pre,post,frequency) of each itemset 
+    n_list={}
+    sorted_words=sorted(words_frequency,key=words_frequency.get,reverse=True)
+    for w in sorted_words:
+        c_List=[]
+        c_List=tree.getNodesByValues(tree.root,w,c_List)
+        n_list[(w,)]=c_List
+
+
+    #find frequent closed itemsets and print them
+    result={}
+    result=find_FCI(n_list,min_support)
+    temp_list=[]
+
+
+
+    print("**************************************************************")
+    print(file_adress+':')
+    for key,value in result.items():
+        print (str(key)+"-------> Support: "+str((GetFrequency(value)/total)*100))
+    print("--------------------------------------------------------------")
+
+
+
+    
+
 
 #normalize the frequency of words and delete the words with frequency less than support(0.1)
 """ total = sum(words_count.values(), 0.0)
@@ -342,55 +410,12 @@ for key,value in words_count.items():
     if words_count[key]>0.1:
         words_frequency[key]=words_count[key] """
 
-# delete the words with frequency less than support(0.1)
-total = sum(words_count.values(), 0.0)
-words_frequency={}
-for key,value in words_count.items():
-    if (words_count[key] /total)*100>0.8:
-        words_frequency[key]=words_count[key]
+
    
 
 
-#sort the paragraph_words by the values and save that in a list
-for i in range(len(paragraph_words)):
-    temp={}
-    for w in paragraph_words[i]:
-        try:
-            temp[w]=words_frequency[w]
-        except:
-            pass
-    paragraph_words[i]=sorted(temp,key=temp.get,reverse=True)
+
   
-#Add words in each paragraph which has the min supp and be sorted, to tree
-tree=Tree()
-temp_paragraph_words=paragraph_words
-for pw in temp_paragraph_words:
-    try:
-        if(len(pw)>0):
-            tree.addToTree(tree.root,pw)
-    except (RuntimeError, TypeError, NameError):
-        print(NameError)
-    
-tree.postorder(tree.root)
-tree.preorder(tree.root)
-
-#create the N-list which contatins itemset and the tuples(pre,post,frequency) of each itemset 
-n_list={}
-sorted_words=sorted(words_frequency,key=words_frequency.get,reverse=True)
-for w in sorted_words:
-    c_List=[]
-    c_List=tree.getNodesByValues(tree.root,w,c_List)
-    n_list[(w,)]=c_List
-
-
-#find frequent closed itemsets and print them
-result={}
-result=find_FCI(n_list,4)
-print(result.keys())
-
-
-
-
 
 
 
